@@ -828,6 +828,197 @@ body {
   outline-offset: 1px;
 }
 
+.admin-einstellungen {
+  margin-top: 1.25rem;
+  padding: 1.15rem 1.2rem 1.2rem;
+  border: 1px solid rgba(138, 98, 54, 0.28);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, rgba(95, 125, 90, 0.08), transparent 11rem),
+    rgba(255, 254, 251, 0.88);
+  box-shadow: 0 8px 20px rgba(74, 56, 32, 0.07);
+}
+
+.admin-einstellungen h3 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+
+.admin-einstellungen-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-einstellungen-typ {
+  margin: 0 0 0.15rem;
+  color: var(--text-leise);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.admin-einstellungen-beschreibung {
+  max-width: 60ch;
+  margin: 0.65rem 0 1rem;
+  color: var(--text-leise);
+  font-size: 0.9rem;
+}
+
+.webhook-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.28rem 0.65rem;
+  border: 1px solid rgba(122, 108, 91, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-leise);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.webhook-status-punkt {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #9b8e7e;
+  box-shadow: 0 0 0 3px rgba(122, 108, 91, 0.12);
+}
+
+.webhook-status-aktiv {
+  border-color: rgba(95, 125, 90, 0.35);
+  background: rgba(95, 125, 90, 0.1);
+  color: #3f633b;
+}
+
+.webhook-status-aktiv .webhook-status-punkt {
+  background: var(--gruen);
+  box-shadow: 0 0 0 3px rgba(95, 125, 90, 0.16);
+}
+
+.admin-einstellungen .hinweis {
+  margin-bottom: 1rem;
+}
+
+.admin-webhook-zeile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.admin-webhook-zeile .admin-formular {
+  flex: 1 1 32rem;
+  max-width: none;
+}
+
+.admin-webhook-formular {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.9rem;
+}
+
+.admin-formular-feld {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin-formular-feld .formular-label {
+  width: auto;
+}
+
+.admin-webhook-formular .admin-eingabe {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-webhook-farbe-zeile {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.admin-farbeingabe {
+  width: 3.25rem !important;
+  height: 2.5rem;
+  padding: 0.22rem;
+  cursor: pointer;
+}
+
+.admin-farbeingabe::-webkit-color-swatch-wrapper { padding: 0; }
+
+.admin-farbeingabe::-webkit-color-swatch {
+  border: 1px solid rgba(122, 108, 91, 0.4);
+  border-radius: 5px;
+}
+
+.admin-webhook-farbe-wert {
+  min-width: 5.6rem;
+  padding: 0.52rem 0.7rem;
+  border: 1px solid rgba(138, 98, 54, 0.22);
+  border-radius: 6px;
+  background: #fffefb;
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.admin-textbereich {
+  min-height: 6.5rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.formular-hilfe {
+  color: var(--text-leise);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.formular-hilfe code {
+  padding: 0.08rem 0.3rem;
+  border: 1px solid rgba(95, 125, 90, 0.24);
+  border-radius: 4px;
+  background: rgba(95, 125, 90, 0.09);
+  color: #3f633b;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.95em;
+  font-weight: 700;
+}
+
+.admin-webhook-aktionen {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.admin-webhook-entfernen {
+  margin: 0;
+}
+
+.knoepf-gefahr:hover {
+  border-color: rgba(180, 84, 63, 0.55);
+  color: #8d3e2d;
+  background: #fff9f6;
+}
+
+.hinweis-erfolg {
+  background: rgba(78, 137, 89, 0.12);
+  border: 1px solid rgba(78, 137, 89, 0.35);
+  color: #35633d;
+}
+
 .admin-liste {
   list-style: none;
   margin: 1.25rem 0 0;
@@ -883,6 +1074,31 @@ body {
 }
 
 @media (max-width: 720px) {
+  .admin-einstellungen {
+    padding: 1rem;
+  }
+
+  .admin-einstellungen-kopf {
+    align-items: flex-start;
+  }
+
+  .admin-webhook-zeile,
+  .admin-webhook-formular {
+    align-items: stretch;
+  }
+
+  .admin-webhook-formular .admin-eingabe,
+  .admin-webhook-formular .knoepf,
+  .admin-webhook-entfernen,
+  .admin-webhook-entfernen .knoepf {
+    width: 100%;
+  }
+
+  .admin-webhook-formular .knoepf,
+  .admin-webhook-entfernen .knoepf {
+    min-height: 46px;
+  }
+
   .admin-eintrag {
     flex-wrap: wrap;
   }

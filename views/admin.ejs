@@ -53,6 +53,155 @@
             </form>
           </div>
 
+          <section class="admin-einstellungen" aria-labelledby="discord-webhook-titel">
+            <div class="admin-einstellungen-kopf">
+              <div>
+                <p class="admin-einstellungen-typ">Benachrichtigungen</p>
+                <h3 id="discord-webhook-titel">Discord-Webhook</h3>
+              </div>
+              <p
+                class="webhook-status <%= webhookKonfiguriert ? 'webhook-status-aktiv' : 'webhook-status-inaktiv' %>"
+                aria-label="Webhook-Status: <%= webhookKonfiguriert ? 'aktiv' : 'nicht eingerichtet' %>"
+              >
+                <span class="webhook-status-punkt" aria-hidden="true"></span>
+                <%= webhookKonfiguriert ? 'Aktiv' : 'Nicht eingerichtet' %>
+              </p>
+            </div>
+
+            <p class="admin-einstellungen-beschreibung" id="webhook-hinweis">
+              Bei einem neuen Wunsch wird eine Nachricht an Discord gesendet.
+              Die gespeicherte Adresse bleibt verborgen.
+            </p>
+
+            <% if (webhookStatus) { %>
+              <p
+                class="hinweis <%= webhookStatus === 'gespeichert' || webhookStatus === 'entfernt' ? 'hinweis-erfolg' : 'hinweis-fehler' %>"
+                role="<%= webhookStatus === 'gespeichert' || webhookStatus === 'entfernt' ? 'status' : 'alert' %>"
+              >
+                <% if (webhookStatus === 'gespeichert') { %>
+                  Die Discord-Einstellungen wurden gespeichert.
+                <% } else if (webhookStatus === 'entfernt') { %>
+                  Der Discord-Webhook wurde entfernt.
+                <% } else if (webhookStatus === 'ungueltig') { %>
+                  Bitte gib eine g&uuml;ltige Discord-Webhook-Adresse ein.
+                <% } else if (webhookStatus === 'name-ungueltig') { %>
+                  Der Webhook-Name muss zwischen 1 und 80 Zeichen lang sein.
+                <% } else if (webhookStatus === 'nachricht-ungueltig') { %>
+                  Die Nachricht darf h&ouml;chstens 1000 Zeichen lang sein.
+                <% } else if (webhookStatus === 'farbe-ungueltig') { %>
+                  Die Embed-Farbe muss als sechsstelliger Hex-Wert wie #f2c94c angegeben werden.
+                  Die Nachricht darf h&ouml;chstens 1000 Zeichen lang sein.
+                <% } else { %>
+                  Die Einstellung konnte nicht gespeichert werden.
+                <% } %>
+              </p>
+            <% } %>
+
+            <div class="admin-webhook-zeile">
+              <form class="admin-formular admin-webhook-formular" method="post" action="/admin/webhook">
+                <div class="admin-formular-feld">
+                  <label class="formular-label" for="webhook-url">
+                    <%= webhookKonfiguriert ? 'Webhook-Adresse ersetzen' : 'Webhook-Adresse' %>
+                  </label>
+                  <input
+                    class="admin-eingabe"
+                    type="password"
+                    id="webhook-url"
+                    name="webhookUrl"
+                    <%= webhookKonfiguriert ? '' : 'required' %>
+                    autocomplete="new-password"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    inputmode="url"
+                    aria-describedby="webhook-url-hilfe"
+                    placeholder="<%= webhookKonfiguriert ? 'Leer lassen, um die gespeicherte Adresse zu behalten' : 'https://discord.com/api/webhooks/...' %>"
+                  />
+                  <small class="formular-hilfe" id="webhook-url-hilfe">
+                    Die gespeicherte Adresse wird aus Sicherheitsgr&uuml;nden nie angezeigt.
+                  </small>
+                </div>
+
+                <div class="admin-formular-feld">
+                  <label class="formular-label" for="webhook-name">Webhook-Name</label>
+                  <input
+                    class="admin-eingabe"
+                    type="text"
+                    id="webhook-name"
+                    name="webhookName"
+                    value="<%= webhookName %>"
+                    required
+                    maxlength="80"
+                    autocomplete="off"
+                  />
+                  <small class="formular-hilfe">So erscheint der Absender in Discord.</small>
+                </div>
+
+                <div class="admin-formular-feld">
+                  <label class="formular-label" for="webhook-titel">Titel</label>
+                  <input
+                    class="admin-eingabe"
+                    type="text"
+                    id="webhook-titel"
+                    name="webhookTitel"
+                    value="<%= webhookTitel %>"
+                    required
+                    maxlength="256"
+                    autocomplete="off"
+                  />
+                  <small class="formular-hilfe">Die Überschrift der Discord-Nachricht.</small>
+                </div>
+
+                <div class="admin-formular-feld">
+                  <label class="formular-label" for="webhook-nachricht">Nachricht</label>
+                  <textarea
+                    class="admin-eingabe admin-textbereich"
+                    id="webhook-nachricht"
+                    name="webhookNachricht"
+                    maxlength="1000"
+                    rows="4"
+                    aria-describedby="webhook-nachricht-hilfe"
+                  ><%= webhookNachricht %></textarea>
+                  <small class="formular-hilfe" id="webhook-nachricht-hilfe">
+                    <code>{wunsch}</code> setzt den neuen Wunsch ein. Fehlt der Platzhalter,
+                    wird der Wunsch automatisch angeh&auml;ngt.
+                  </small>
+                </div>
+
+                <div class="admin-formular-feld admin-webhook-farbe-feld">
+                  <label class="formular-label" for="webhook-farbe">Embed-Farbe</label>
+                  <div class="admin-webhook-farbe-zeile">
+                    <input
+                      class="admin-eingabe admin-farbeingabe"
+                      type="color"
+                      id="webhook-farbe"
+                      name="webhookFarbe"
+                      value="<%= webhookFarbe %>"
+                      aria-describedby="webhook-farbe-hilfe"
+                    />
+                    <output class="admin-webhook-farbe-wert" for="webhook-farbe"><%= webhookFarbe %></output>
+                  </div>
+                  <small class="formular-hilfe" id="webhook-farbe-hilfe">
+                    Akzentfarbe am linken Rand der Discord-Embed-Nachricht.
+                    Hex-Wert: sechs Stellen, zum Beispiel <code>#f2c94c</code>.
+                  </small>
+                </div>
+
+                <div class="admin-webhook-aktionen">
+                  <button class="knoepf" type="submit">Einstellungen speichern</button>
+                </div>
+              </form>
+
+              <% if (webhookKonfiguriert) { %>
+                <form class="admin-webhook-entfernen" method="post" action="/admin/webhook">
+                  <input type="hidden" name="aktion" value="entfernen" />
+                  <button class="knoepf knoepf-neutral knoepf-gefahr" type="submit">
+                    Webhook entfernen
+                  </button>
+                </form>
+              <% } %>
+            </div>
+          </section>
+
           <ul class="admin-liste">
             <% eintraege.forEach(function (eintrag) { %>
               <li class="admin-eintrag">

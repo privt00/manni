@@ -9,7 +9,18 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, "storage", "db.json");
+const CONFIG_FILE = path.join(__dirname, "storage", "config.json");
 const MAX_TEXT_LENGTH = 600;
+const DISCORD_TIMEOUT_MS = 5 * 1000;
+const DISCORD_WEBHOOK_NAME_DEFAULT = "Wunsch-Pinnwand";
+const DISCORD_TITEL_DEFAULT = "Neuer Wunsch";
+const DISCORD_NACHRICHT_DEFAULT = "{wunsch}";
+const DISCORD_NACHRICHT_LEGACY_DEFAULT = "**Neuer Wunsch**\n{wunsch}";
+const DISCORD_FARBE_DEFAULT = "#f2c94c";
+const DISCORD_WEBHOOK_NAME_MAX = 80;
+const DISCORD_TITEL_MAX = 256;
+const DISCORD_NACHRICHT_MAX = 1000;
+let discordKonfiguration = null;
 
 // Angehängte Bilder landen neben der Datenbank und werden ausgeliefert
 const BILD_ORDNER = path.join(__dirname, "storage", "bilder");
@@ -111,6 +122,7 @@ function readEintraege() {
 }
 
 function writeEintraege(eintraege) {
+  fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
   fs.writeFileSync(DB_FILE, JSON.stringify(eintraege, null, 2), "utf8");
 }
 
@@ -118,6 +130,156 @@ function sortiereNachDatum(eintraege) {
   return eintraege
     .slice()
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+function ladeServerKonfiguration() {
+  try {
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+  } catch (fehler) {
+    if (fehler.code !== "ENOENT") {
+      console.error("Server-Konfiguration konnte nicht gelesen werden:", fehler.message);
+    }
+    return {};
+  }
+}
+
+function ladeDiscordKonfiguration() {
+  const konfiguration = ladeServerKonfiguration();
+  const gespeicherteNachricht =
+    typeof konfiguration.discordNachricht === "string"
+      ? konfiguration.discordNachricht
+      : DISCORD_NACHRICHT_DEFAULT;
+  const hatGespeichertenTitel =
+    typeof konfiguration.discordWebhookTitel === "string" &&
+    konfiguration.discordWebhookTitel.trim();
+  return {
+    discordWebhookUrl:
+      typeof konfiguration.discordWebhookUrl === "string"
+        ? konfiguration.discordWebhookUrl.trim()
+        : "",
+    discordWebhookName:
+      typeof konfiguration.discordWebhookName === "string" &&
+      konfiguration.discordWebhookName.trim()
+        ? konfiguration.discordWebhookName.trim()
+        : DISCORD_WEBHOOK_NAME_DEFAULT,
+    discordWebhookTitel: hatGespeichertenTitel
+      ? konfiguration.discordWebhookTitel.trim()
+      : DISCORD_TITEL_DEFAULT,
+    discordNachricht:
+      !hatGespeichertenTitel && gespeicherteNachricht === DISCORD_NACHRICHT_LEGACY_DEFAULT
+        ? DISCORD_NACHRICHT_DEFAULT
+        : gespeicherteNachricht,
+    discordWebhookFarbe:
+      typeof konfiguration.discordWebhookFarbe === "string" &&
+      /^#[0-9a-fA-F]{6}$/.test(konfiguration.discordWebhookFarbe.trim())
+        ? konfiguration.discordWebhookFarbe.trim().toLowerCase()
+        : DISCORD_FARBE_DEFAULT,
+  };
+}
+
+function speichereDiscordKonfiguration(neueKonfiguration) {
+  const konfiguration = ladeServerKonfiguration();
+  konfiguration.discordWebhookUrl = neueKonfiguration.discordWebhookUrl;
+  konfiguration.discordWebhookName = neueKonfiguration.discordWebhookName;
+  konfiguration.discordWebhookTitel = neueKonfiguration.discordWebhookTitel;
+  konfiguration.discordNachricht = neueKonfiguration.discordNachricht;
+  konfiguration.discordWebhookFarbe = neueKonfiguration.discordWebhookFarbe;
+  fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(
+    CONFIG_FILE,
+    JSON.stringify(konfiguration, null, 2),
+    "utf8",
+  );
+}
+
+function formatiereDiscordNachricht(vorlage, wunsch) {
+  if (vorlage.includes("{wunsch}")) {
+    return vorlage.split("{wunsch}").join(wunsch);
+  }
+  return vorlage ? vorlage + "\n" + wunsch : wunsch;
+}
+
+function istGueltigeDiscordWebhookUrl(wert) {
+  try {
+    const webhookUrl = new URL(wert);
+    const erlaubteHosts = new Set(["discord.com", "discordapp.com"]);
+    return (
+      webhookUrl.protocol === "https:" &&
+      erlaubteHosts.has(webhookUrl.hostname.toLowerCase()) &&
+      /^\/api(?:\/v\d+)?\/webhooks\/\d+\/[^/]+\/?$/.test(webhookUrl.pathname)
+    );
+  } catch (fehler) {
+    return false;
+  }
+}
+
+discordKonfiguration = ladeDiscordKonfiguration();
+
+// Optional: Den serverseitig konfigurierten Discord-Kanal benachrichtigen.
+// Fehler beim Webhook duerfen einen bereits gespeicherten Wunsch nicht betreffen.
+async function benachrichtigeDiscord(eintrag) {
+  if (!discordKonfiguration.discordWebhookUrl) return;
+
+  try {
+    const webhookUrl = new URL(discordKonfiguration.discordWebhookUrl);
+    webhookUrl.searchParams.set("wait", "true");
+
+    const payload = {
+      username: discordKonfiguration.discordWebhookName,
+      allowed_mentions: { parse: [] },
+      embeds: [
+        {
+          title: discordKonfiguration.discordWebhookTitel,
+          description: formatiereDiscordNachricht(
+            discordKonfiguration.discordNachricht,
+            eintrag.text,
+          ),
+          color: parseInt(discordKonfiguration.discordWebhookFarbe.slice(1), 16),
+        },
+      ],
+    };
+
+    const request = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(DISCORD_TIMEOUT_MS),
+    };
+
+    if (eintrag.bild) {
+      const dateiname = path.basename(eintrag.bild);
+      const bildPfad = path.join(BILD_ORDNER, dateiname);
+      const endung = path.extname(dateiname).slice(1).toLowerCase();
+      const mimeType =
+        Object.keys(BILD_ENDUNGEN).find(
+          (typ) => BILD_ENDUNGEN[typ] === endung,
+        ) || "application/octet-stream";
+      const formular = new FormData();
+
+      payload.embeds[0].image = { url: "attachment://" + dateiname };
+      formular.append("payload_json", JSON.stringify(payload));
+      formular.append(
+        "files[0]",
+        new Blob([fs.readFileSync(bildPfad)], { type: mimeType }),
+        dateiname,
+      );
+
+      delete request.headers;
+      request.body = formular;
+    }
+
+    const antwort = await fetch(webhookUrl, {
+      ...request,
+    });
+
+    if (!antwort.ok) {
+      console.error(
+        "Discord-Webhook antwortete mit Status " + antwort.status + ".",
+      );
+    }
+  } catch (fehler) {
+    console.error("Discord-Webhook konnte nicht gesendet werden:", fehler.message);
+  }
 }
 
 // Die Pinnwand ist eine große Karte. Positionen werden in Prozent (0-100) gespeichert.
@@ -415,6 +577,8 @@ app.post("/wuensche", (req, res) => {
     return fehlerAntwort(500, "speicher", { text });
   }
 
+  void benachrichtigeDiscord(eintrag);
+
   if (ajax) {
     return res.json({ ok: true, eintrag: mitPositDaten(eintrag) });
   }
@@ -537,6 +701,68 @@ app.post("/admin/logout", (req, res) => {
   res.redirect("/admin");
 });
 
+// Discord-Webhook im geschuetzten Verwaltungsbereich konfigurieren
+app.post("/admin/webhook", (req, res) => {
+  if (!adminAngemeldet(req)) {
+    return res.redirect("/admin");
+  }
+
+  if (req.body.aktion === "entfernen") {
+    try {
+      const neueKonfiguration = {
+        ...discordKonfiguration,
+        discordWebhookUrl: "",
+      };
+      speichereDiscordKonfiguration(neueKonfiguration);
+      discordKonfiguration = neueKonfiguration;
+      return res.redirect("/admin?webhook=entfernt");
+    } catch (fehler) {
+      console.error("Discord-Webhook konnte nicht entfernt werden:", fehler.message);
+      return res.redirect("/admin?webhook=speicherfehler");
+    }
+  }
+
+  const eingegebeneWebhookUrl = (req.body.webhookUrl || "").toString().trim();
+  const neueWebhookUrl =
+    eingegebeneWebhookUrl || discordKonfiguration.discordWebhookUrl;
+  const neuerWebhookName = (req.body.webhookName || "").toString().trim();
+  const neuerWebhookTitel = (req.body.webhookTitel || "").toString().trim();
+  const neueNachricht = (req.body.webhookNachricht || "").toString();
+  const neueWebhookFarbe = (req.body.webhookFarbe || "").toString().trim().toLowerCase();
+
+  if (!neueWebhookUrl || !istGueltigeDiscordWebhookUrl(neueWebhookUrl)) {
+    return res.redirect("/admin?webhook=ungueltig");
+  }
+  if (!neuerWebhookName || neuerWebhookName.length > DISCORD_WEBHOOK_NAME_MAX) {
+    return res.redirect("/admin?webhook=name-ungueltig");
+  }
+  if (!neuerWebhookTitel || neuerWebhookTitel.length > DISCORD_TITEL_MAX) {
+    return res.redirect("/admin?webhook=titel-ungueltig");
+  }
+  if (neueNachricht.length > DISCORD_NACHRICHT_MAX) {
+    return res.redirect("/admin?webhook=nachricht-ungueltig");
+  }
+  if (!/^#[0-9a-f]{6}$/.test(neueWebhookFarbe)) {
+    return res.redirect("/admin?webhook=farbe-ungueltig");
+  }
+
+  try {
+    const neueKonfiguration = {
+      discordWebhookUrl: neueWebhookUrl,
+      discordWebhookName: neuerWebhookName,
+      discordWebhookTitel: neuerWebhookTitel,
+      discordNachricht: neueNachricht,
+      discordWebhookFarbe: neueWebhookFarbe,
+    };
+    speichereDiscordKonfiguration(neueKonfiguration);
+    discordKonfiguration = neueKonfiguration;
+    return res.redirect("/admin?webhook=gespeichert");
+  } catch (fehler) {
+    console.error("Discord-Webhook konnte nicht gespeichert werden:", fehler.message);
+    return res.redirect("/admin?webhook=speicherfehler");
+  }
+});
+
 // Übersicht mit allen Wünschen (nur für Angemeldete)
 app.get("/admin", (req, res) => {
   const angemeldet = adminAngemeldet(req);
@@ -545,6 +771,12 @@ app.get("/admin", (req, res) => {
     titel: "Verwaltung",
     angemeldet: angemeldet,
     loginFehler: req.query.fehler || null,
+    webhookStatus: req.query.webhook || null,
+    webhookKonfiguriert: Boolean(discordKonfiguration.discordWebhookUrl),
+    webhookName: discordKonfiguration.discordWebhookName,
+    webhookTitel: discordKonfiguration.discordWebhookTitel,
+    webhookNachricht: discordKonfiguration.discordNachricht,
+    webhookFarbe: discordKonfiguration.discordWebhookFarbe,
     eintraege: angemeldet
       ? sortiereNachDatum(ladeEintraege()).map(mitPositDaten)
       : [],

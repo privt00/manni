@@ -1,4 +1,8 @@
 .DS_Store
+.env
+.env.*
+!.env.example
 node_modules/
 /storage/db.json
+/storage/config.json
 /storage/bilder/
